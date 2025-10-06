@@ -1,0 +1,175 @@
+---
+title: "Assignment Module 6 - Transportation Model Dual"
+author: "Dibakar Bhowal"
+date: "2024-10-13"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+
+
+```{r}
+library(lpSolve)
+library(lpSolveAPI)
+library(tinytex)
+```
+
+
+$$Question\ 1-\ Primal\ Formulation\ and\ Solution $$
+
+$$Min\ Z = \sum_{i=1}^{3} \sum_{j=1}^{4} c_{ij} x_{ij}$$
+
+$$Where: (x_{ij})\ is\ the\ number\ of\ AEDs\ transported\ from\ plant\ (i)\ to\ warehouse\ (j)$$
+$$(c_{ij})\ is\ the\ cost\ of\ producing+shipping\ one\ unit\ from\ plant\ (i)\ to\ warehouse\ (j)$$
+
+
+$$\text{Supply Constraints:}$$
+
+$$x_{i1} + x_{i2} + x_{i3} + x_{i4} \leq \text{capacity of plant } i$$
+
+$$x_{11} + x_{12} + x_{13} + x_{14} \leq 100$$
+
+$$x_{21} + x_{22} + x_{23} + x_{24} \leq 125$$
+
+$$x_{31} + x_{32} + x_{33} + x_{34} \leq 150$$
+
+
+$$\text{Demand Constraints:}$$
+
+$$x_{11} + x_{21} + x_{31}\ge 80$$
+
+$$x_{12} + x_{22} + x_{32}\ge 90$$
+
+$$x_{13} + x_{23} + x_{33}\ge 70$$
+
+$$\text{The dummy warehouse absorbs the surplus supply:}$$
+
+$$x_{14} + x_{24} + x_{34}\ge 135$$
+
+$$\text{Non-negativity Constraints:}$$
+
+$$x_{ij}\ge 0$$
+
+$$Where:
+i=1,2,3\ and\ j=1,2,3,4$$
+
+
+
+```{r}
+costs <- matrix(c(
+  420, 414, 425, 0,
+  312, 315, 314, 0,
+  510, 512, 515, 0
+), nrow = 3, byrow = TRUE)
+
+supply <- c(100, 125, 150)
+
+demand <- c(80, 90, 70, 135)
+
+solution <- lp.transport(costs, "min", row.signs = rep("<=", 3), row.rhs = supply,
+                         col.signs = rep(">=", 4), col.rhs = demand)
+
+print(solution)
+
+optimal_transportation <- solution$solution
+print(optimal_transportation)
+```
+
+
+$$Question\ 2-\ Dual\ Formulation\ and\ Solution$$
+
+$$Max\ W = 80v_1 + 90v_2 + 70v_3 + 135v_4$$
+
+$$Where:(v_1, v_2, v_3)\ are\ shadow\ prices\ for\ demands\ at\ warehouses\ 1,\ 2,\ 3$$
+$$(v_4)\ is\ the\ shadow\ price\ for\ the\ dummy\ warehouse\ (surplus\ capacity)$$
+
+
+$$\text{Dual Constraints}:$$
+
+
+$$\text{For Plant A:}$$
+
+$$u_1 + v_1 \leq 420$$
+
+$$u_1 + v_2 \leq 414$$
+
+$$u_1 + v_3 \leq 425$$
+
+$$u_1 + v_4 \leq 0$$
+
+
+$$\text{For Plant B:}$$
+
+$$u_2 + v_1 \leq 312$$
+
+$$u_2 + v_2 \leq 315$$
+
+$$u_2 + v_3 \leq 314$$
+
+$$u_2 + v_4 \leq 0$$
+
+
+$$\text{For Plant C:}$$
+
+$$u_3 + v_1 \leq 510$$
+
+$$u_3 + v_2 \leq 512$$
+
+$$u_3 + v_3 \leq 515$$
+
+$$u_3 + v_4 \leq 0$$
+
+
+
+```{r}
+dual_objective <- c(80, 90, 70, 135)
+
+
+dual_constraints <- matrix(c(
+  1, 0, 0, 0, 1, 0, 0, 0,  
+  1, 0, 0, 0, 0, 1, 0, 0,  
+  1, 0, 0, 0, 0, 0, 1, 0,  
+  1, 0, 0, 0, 0, 0, 0, 1,  
+
+  0, 1, 0, 0, 1, 0, 0, 0,  
+  0, 1, 0, 0, 0, 1, 0, 0,  
+  0, 1, 0, 0, 0, 0, 1, 0,  
+  0, 1, 0, 0, 0, 0, 0, 1,  
+
+  0, 0, 1, 0, 1, 0, 0, 0,  
+  0, 0, 1, 0, 0, 1, 0, 0,  
+  0, 0, 1, 0, 0, 0, 1, 0,  
+  0, 0, 1, 0, 0, 0, 0, 1   
+), nrow = 12, byrow = TRUE)
+
+dual_rhs <- c(420, 414, 425, 0, 312, 315, 314, 0, 510, 512, 515, 0)
+
+dual_directions <- rep("<=", 12)
+
+dual_solution <- lp("max", dual_objective, dual_constraints, dual_directions, dual_rhs)
+
+print(solution)
+
+dual_optimal <- dual_solution$solution
+print(dual_optimal)
+```
+
+
+$$Question\ 3-\ Economic\ Interpretaion$$
+
+$$\text{Plant A sends 10 units to warehouse 1 and 90 units to warehouse 2(Fully satisfying the demand of warehouse 2)}$$
+$$\text{Plant B sends 55 units to warehouse 1 and 70 units to warehouse 3(Fully satisfying the demand of warehouse 3})$$
+$$\text{Plant C sends 15 units to warehouse 1(Completing warehouse 1's demand) and 135 units to the dummy warehouse.}$$
+
+
+$$\text{Warehouse 2 is the critical constraint because it's shadow price is 315 while for warehouse 1,3 and dummy it's 0}$$
+$$\text{Indicating increasing demand at warehouse 2 will increase the overall cost by 315 per unit while}$$
+$$\text{increasing demand at warehouse 1,3 and dummy wouldn't cause any additional cost.}$$
+$$\text{So, warehouse 2 is a bottleneck to the production process.}$$
